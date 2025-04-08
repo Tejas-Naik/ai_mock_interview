@@ -45,6 +45,9 @@ function AuthForm({ type }: { type: FormType }) {
         return;
       }
       
+      // Log the Google profile picture URL for debugging
+      console.log("Google user photo URL:", userCredentials.user.photoURL);
+      
       // Always check if user exists in Firestore and create if not (for both sign-in and sign-up)
       // This prevents the auth redirect loop issue
       const result = await SignUp({
@@ -52,6 +55,7 @@ function AuthForm({ type }: { type: FormType }) {
         name: userCredentials.user.displayName || "Google User",
         email: userCredentials.user.email!,
         password: "", // Not needed for Google auth
+        photoURL: userCredentials.user.photoURL || "", // Save the profile picture URL
       });
       
       // Don't stop if user already exists - that's fine, we'll just sign them in

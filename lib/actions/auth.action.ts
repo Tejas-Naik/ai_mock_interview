@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 const ONE_WEEK = 60 * 60 * 24 * 7;
 
 export async function SignUp(params: SignUpParams) {
-  const { uid, name, email } = params;
+  const { uid, name, email, photoURL } = params;
 
   try {
     const userRecord = await db.collection("users").doc(uid).get();
@@ -21,6 +21,7 @@ export async function SignUp(params: SignUpParams) {
     await db.collection("users").doc(uid).set({
       name,
       email,
+      photoURL: photoURL || "",
     });
 
     return {
