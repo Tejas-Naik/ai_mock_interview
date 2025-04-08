@@ -10,10 +10,11 @@ import Link from "next/link";
 import { toast } from "sonner";
 import FormField from "./FormField";
 import { useRouter } from "next/navigation";
-import { auth } from "@/firebase/client";
+import { auth, googleProvider } from "@/firebase/client";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
 } from "firebase/auth";
 import { SignIn, SignUp } from "@/lib/actions/auth.action";
 
@@ -32,6 +33,52 @@ const authFormSchema = (type: FormType) => {
 function AuthForm({ type }: { type: FormType }) {
   const router = useRouter();
   const formSchema = authFormSchema(type);
+  
+  // Handle Google Sign In
+  const handleGoogleSignIn = async () => {
+    try {
+      const userCredentials = await signInWithPopup(auth, googleProvider);
+      const idToken = await userCredentials.user.getIdToken();
+      
+      if (!idToken) {
+        toast.error("Failed to sign in with Google");
+        return;
+      }
+      
+      // Always check if user exists in Firestore and create if not (for both sign-in and sign-up)
+      // This prevents the auth redirect loop issue
+      const result = await SignUp({
+        uid: userCredentials.user.uid,
+        name: userCredentials.user.displayName || "Google User",
+        email: userCredentials.user.email!,
+        password: "", // Not needed for Google auth
+      });
+      
+      // Don't stop if user already exists - that's fine, we'll just sign them in
+      // Only stop for other errors
+      if (!result?.success && !result?.message.includes("already exists")) {
+        toast.error(result?.message || "Failed to create account");
+        return;
+      }
+      
+      // For both sign in and sign up, set the session cookie
+      const signInResult = await SignIn({
+        email: userCredentials.user.email!,
+        idToken,
+      });
+      
+      if (!signInResult?.success) {
+        toast.error(signInResult?.message || "Failed to complete sign in");
+        return;
+      }
+      
+      toast.success(`${type === "sign-in" ? "Signed in" : "Signed up"} with Google successfully!`);
+      router.push("/");
+    } catch (error: any) {
+      console.error("Google auth error:", error);
+      toast.error(error.message || "Failed to authenticate with Google");
+    }
+  };
 
   // 1. Define your form.
   const form = useForm<z.infer<typeof formSchema>>({
@@ -140,6 +187,25 @@ function AuthForm({ type }: { type: FormType }) {
             />
             <Button className="btn" type="submit">
               {isSignIn ? "Sign In" : "Create an account"}
+            </Button>
+            
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              </div>
+            </div>
+            
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full flex items-center justify-center gap-2"
+              onClick={handleGoogleSignIn}
+            >
+              <Image src="/google.svg" alt="Google logo" width={20} height={20} />
+              {isSignIn ? "Sign in with Google" : "Sign up with Google"}
             </Button>
           </form>
         </Form>
